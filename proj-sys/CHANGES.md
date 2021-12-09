@@ -1,3 +1,7 @@
+# Unreleased
+
+- Update to PROJ 8.2.0
+
 # 0.21.0
 
 - BREAKING: Remove `bundled_proj_tiff` feature and assume system libproj has
