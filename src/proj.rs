@@ -632,21 +632,30 @@ impl Proj {
         };
         let c_x: c_double = point.x().to_f64().ok_or(ProjError::FloatConversion)?;
         let c_y: c_double = point.y().to_f64().ok_or(ProjError::FloatConversion)?;
+        let coord = if inverse {
+            // Converting from degrees
+            PJ_COORD { xy: PJ_XY { x: c_x, y: c_y }}
+        } else {
+            // Converting to degrees
+            PJ_COORD { lp: PJ_LP { lam: c_x, phi: c_y }}
+        };
         let new_x;
         let new_y;
         let err;
-        // Input coords are defined in terms of lambda & phi, using the PJ_LP struct.
-        // This signals that we wish to project geodetic coordinates.
-        // For conversion (i.e. between projected coordinates) you should use
-        // PJ_XY {x: , y: }
-        let coords = PJ_LP { lam: c_x, phi: c_y };
         unsafe {
             proj_errno_reset(self.c_proj);
             // PJ_DIRECTION_* determines a forward or inverse projection
-            let trans = proj_trans(self.c_proj, inv, PJ_COORD { lp: coords });
+            let trans = proj_trans(self.c_proj, inv, coord);
             // output of coordinates uses the PJ_XY struct
-            new_x = trans.xy.x;
-            new_y = trans.xy.y;
+            if inverse {
+                // converted to degrees
+                new_x = trans.lp.lam;
+                new_y = trans.lp.phi;
+            } else {
+                // converted from degrees
+                new_x = trans.xy.x;
+                new_y = trans.xy.y;
+            }
             err = proj_errno(self.c_proj);
         }
         if err == 0 {
