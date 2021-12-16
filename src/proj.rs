@@ -633,10 +633,10 @@ impl Proj {
         let c_x: c_double = point.x().to_f64().ok_or(ProjError::FloatConversion)?;
         let c_y: c_double = point.y().to_f64().ok_or(ProjError::FloatConversion)?;
         let coord = if inverse {
-            // Converting from degrees
+            // Converting to degrees
             PJ_COORD { xy: PJ_XY { x: c_x, y: c_y }}
         } else {
-            // Converting to degrees
+            // Converting from degrees
             PJ_COORD { lp: PJ_LP { lam: c_x, phi: c_y }}
         };
         let new_x;
