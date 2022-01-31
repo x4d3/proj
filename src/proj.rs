@@ -10,7 +10,7 @@ use proj_sys::{
     proj_trans, proj_trans_array, PJconsts, PJ_AREA, PJ_CONTEXT, PJ_COORD, PJ_DIRECTION_PJ_FWD,
     PJ_DIRECTION_PJ_INV, PJ_INFO, PJ_LP, PJ_XY, proj_context_errno
 };
-use std::{fmt::{self, Debug}, str};
+use std::{convert, ffi, fmt::{self, Debug}, str};
 
 #[cfg(feature = "network")]
 use proj_sys::proj_context_set_enable_network;
@@ -97,8 +97,8 @@ pub enum ProjError {
 
 #[derive(Error, Debug)]
 pub enum ProjCreateError {
-    #[error("A nul byte was found in the PROJ string definition or CRS argument")]
-    ArgumentNulError,
+    #[error("A nul byte was found in the PROJ string definition or CRS argument: {0}")]
+    ArgumentNulError(ffi::NulError),
     #[error("The underlying PROJ call failed: {0}")]
     ProjError(String),
     #[error("A UTF8 error occurred when constructing a PROJ error message")]
@@ -159,7 +159,7 @@ fn area_set_bbox(parea: *mut proj_sys::PJ_AREA, new_area: Option<Area>) {
 
 /// called by Proj::new and ProjBuilder::transform_new_crs
 fn transform_string(ctx: *mut PJ_CONTEXT, definition: &str) -> Result<Proj, ProjCreateError> {
-    let c_definition = CString::new(definition).map_err(|_| ProjCreateError::ArgumentNulError)?;
+    let c_definition = CString::new(definition).map_err(|e| ProjCreateError::ArgumentNulError(e))?;
     unsafe { proj_errno_reset(std::ptr::null()) };
     let new_c_proj = unsafe { proj_create(ctx, c_definition.as_ptr()) };
     if new_c_proj.is_null() {
@@ -183,8 +183,8 @@ fn transform_epsg(
     to: &str,
     area: Option<Area>,
 ) -> Result<Proj, ProjCreateError> {
-    let from_c = CString::new(from).map_err(|_| ProjCreateError::ArgumentNulError)?;
-    let to_c = CString::new(to).map_err(|_| ProjCreateError::ArgumentNulError)?;
+    let from_c = CString::new(from).map_err(|e| ProjCreateError::ArgumentNulError(e))?;
+    let to_c = CString::new(to).map_err(|e| ProjCreateError::ArgumentNulError(e))?;
     let proj_area = unsafe { proj_area_create() };
     area_set_bbox(proj_area, area);
     unsafe { proj_errno_reset(std::ptr::null()) };
@@ -1074,12 +1074,12 @@ mod test {
     #[test]
     fn test_from_crs_nul_error() {
         match Proj::new_known_crs("\0", "EPSG:4326", None) {
-            Err(ProjCreateError::ArgumentNulError) => (),
+            Err(ProjCreateError::ArgumentNulError(_)) => (),
             _ => unreachable!(),
         }
 
         match Proj::new_known_crs("EPSG:4326", "\0", None) {
-            Err(ProjCreateError::ArgumentNulError) => (),
+            Err(ProjCreateError::ArgumentNulError(_)) => (),
             _ => unreachable!(),
         }
     }
@@ -1179,7 +1179,7 @@ mod test {
     // Test that instantiation fails wth bad proj string input
     fn test_init_error_nul() {
         match Proj::new("\0") {
-            Err(ProjCreateError::ArgumentNulError) => (),
+            Err(ProjCreateError::ArgumentNulError(_)) => (),
             _ => unreachable!(),
         }
     }
